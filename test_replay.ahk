@@ -32,7 +32,7 @@ SetDefaultMouseSpeed, 0
 ; Global variables
 global IsReplayActive := false
 global IterationCount := 0
-global ImagePath := A_ScriptDir . "\images\add.png"
+global ImagePath := A_ScriptDir . "\images\completed.png"
 
 ; Create GUI for status display
 Gui, Add, Text, x10 y10 w300 h20 vStatusText, Battle Replay Script Ready
@@ -56,7 +56,7 @@ if (IsReplayActive) {
     SetTimer, ReplayLoop, 5000  ; Check every 5 seconds like Python version
     GuiControl,, StatusText, Replay Active - Searching...
     GuiControl,, LastActionText, Last Action: Started replay loop
-    ToolTip, Replay Started - Searching for add button
+    ToolTip, Replay Started - Waiting for completion
     SetTimer, RemoveToolTip, 2000
 }
 return
@@ -72,7 +72,7 @@ ExitApp
 
 ; Main replay loop function
 ReplayLoop:
-if (!IsReplayActive and A_ThisLabel != "F8") {
+if (!IsReplayActive) {
     return
 }
 
@@ -85,40 +85,32 @@ IfNotExist, %ImagePath%
     return
 }
 
-; Search for the image with high confidence
+; Search for the image
 ImageSearch, FoundX, FoundY, 0, 0, %A_ScreenWidth%, %A_ScreenHeight%, *50 %ImagePath%
 
 if (ErrorLevel = 0) {
-    ; Image found - calculate center coordinates
-    ; Note: ImageSearch returns top-left corner, we need to add half the image size
-    ; For now, we'll use the found coordinates directly
-    CenterX := FoundX
-    CenterY := FoundY
-    
+    ; Image found
     ; Increment iteration counter
     IterationCount++
     GuiControl,, IterationText, Iterations: %IterationCount%
-    GuiControl,, LastActionText, Last Action: Found button at %CenterX%`, %CenterY%
-    
-    ; Display found coordinates
-    ToolTip, Battle replayed %IterationCount% times. Add button found at: %CenterX%`, %CenterY%
-    SetTimer, RemoveToolTip, 3000
-    
-    ; Move cursor and click using ultra brutal methods
-    UltraBrutalDirectClick(CenterX, CenterY)
-    
-    ; Small delay to ensure cursor is positioned
-    Sleep, 100
-    
-    ; Send F3 key using multiple methods
-    UltraBrutalF3()
-    
-} else {
-    GuiControl,, LastActionText, Last Action: Add button not found
-    if (A_ThisLabel = "F8") {
-        ToolTip, Add button not found on screen
-        SetTimer, RemoveToolTip, 3000
+
+    ; Iterate through array of coordinates and click each one in order
+    replayCoords := [{x: 2168, y: 1271}, {x: 1787, y: 1268}, {x: 1105, y: 836}, {x: 1276, y: 1233}, {x: 2215, y: 1087}]
+
+    for index, coords in replayCoords
+    {
+        xCoord := coords.x
+        yCoord := coords.y
+        sleep, 1500
+        UltraBrutalDirectClick(xCoord, yCoord)
+        sleep, 500
+        UltraBrutalF3()
     }
+
+    sleep, 5000
+    
+    ToolTip, Battle replayed %IterationCount% times.
+    SetTimer, RemoveToolTip, 3000
 }
 return
 
@@ -208,29 +200,3 @@ GuiClose:
 ExitApp
 
 ; Additional hotkeys for testing
-
-; F7 - Test direct click at current mouse position
-F7::
-MouseGetPos, TestX, TestY
-ToolTip, Testing ultra brutal direct click at: %TestX%`, %TestY%
-SetTimer, RemoveToolTip, 3000
-UltraBrutalDirectClick(TestX, TestY)
-return
-
-; F6 - Test F3 keypress
-F6::
-ToolTip, Testing ultra brutal F3 keypress
-SetTimer, RemoveToolTip, 2000
-UltraBrutalF3()
-return
-
-; F5 - Show current status
-F5::
-if (IsReplayActive) {
-    Status := "ACTIVE"
-} else {
-    Status := "STOPPED"
-}
-ToolTip, Replay Status: %Status% | Iterations: %IterationCount%
-SetTimer, RemoveToolTip, 3000
-return
