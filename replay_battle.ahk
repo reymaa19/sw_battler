@@ -1,5 +1,5 @@
-; AutoHotkey Battle Replay Script - Equivalent to replay.py
-; This script continuously searches for an "add" button image and clicks it
+; AutoHotkey Battle Replay Script
+; This script continuously searches for an "result" image to perform a sequence of clicks
 ; Press F9 to start/stop the replay loop
 ; Press ESC to exit completely
 
@@ -32,7 +32,7 @@ SetDefaultMouseSpeed, 0
 ; Global variables
 global IsReplayActive := false
 global IterationCount := 0
-global ImagePath := A_ScriptDir . "\images\completed.png"
+global ImagePath:= A_ScriptDir . "\images\result.png"
 
 ; Create GUI for status display
 Gui, Add, Text, x10 y10 w300 h20 vStatusText, Battle Replay Script Ready
@@ -50,14 +50,14 @@ if (IsReplayActive) {
     GuiControl,, StatusText, Replay Stopped
     GuiControl,, LastActionText, Last Action: Stopped by user
     ToolTip, Replay Stopped
-    SetTimer, RemoveToolTip, 2000
+    SetTimer, RemoveToolTip, 1000
 } else {
     IsReplayActive := true
-    SetTimer, ReplayLoop, 5000  ; Check every 5 seconds like Python version
+    SetTimer, ReplayLoop, 1000 ; Check every 1 second if done
     GuiControl,, StatusText, Replay Active - Searching...
     GuiControl,, LastActionText, Last Action: Started replay loop
     ToolTip, Replay Started - Waiting for completion
-    SetTimer, RemoveToolTip, 2000
+    SetTimer, RemoveToolTip, 1000
 }
 return
 
@@ -76,43 +76,27 @@ if (!IsReplayActive) {
     return
 }
 
-; Check if image file exists
-IfNotExist, %ImagePath%
-{
-    GuiControl,, LastActionText, Last Action: Image file not found!
-    ToolTip, Image file not found: %ImagePath%
-    SetTimer, RemoveToolTip, 3000
-    return
+; Search for end result
+ImageSearch, FoundX, FoundY, 0, 0, %A_ScreenWidth%, %A_ScreenHeight%, *50 %ImagePath%
+if (ErrorLevel = 0) {
+    ReplayClicks()
 }
 
-; Search for the image
-ImageSearch, FoundX, FoundY, 0, 0, %A_ScreenWidth%, %A_ScreenHeight%, *50 %ImagePath%
+return
 
-if (ErrorLevel = 0) {
-    ; Image found
-    ; Increment iteration counter
+ReplayClicks() {
     IterationCount++
     GuiControl,, IterationText, Iterations: %IterationCount%
 
-    ; Iterate through array of coordinates and click each one in order
-    replayCoords := [{x: 2168, y: 1271}, {x: 1787, y: 1268}, {x: 1105, y: 836}, {x: 1276, y: 1233}, {x: 2215, y: 1087}]
+    replayCoords := [{x: 2168, y: 1271}, {x: 1787, y: 1268}, {x: 1280, y: 720}, {x: 1105, y: 836}, {x: 1276, y: 1233}, {x: 2215, y: 1087}]
 
-    for index, coords in replayCoords
-    {
-        xCoord := coords.x
-        yCoord := coords.y
-        sleep, 1500
-        UltraBrutalDirectClick(xCoord, yCoord)
-        sleep, 500
-        UltraBrutalF3()
+    for index, coords in replayCoords {
+        Sleep, 3000
+        UltraBrutalDirectClick(coords.x, coords.y)
     }
 
-    sleep, 5000
-    
-    ToolTip, Battle replayed %IterationCount% times.
-    SetTimer, RemoveToolTip, 3000
+    Sleep, 2000
 }
-return
 
 ; Ultra brutal direct click function - Now uses direct window message clicking
 UltraBrutalDirectClick(x, y) {
@@ -127,23 +111,6 @@ UltraBrutalDirectClick(x, y) {
     
     GuiControl,, LastActionText, Clicking at screen: %x%`, %y% relative: %relX%`, %relY%
     
-    ; Method 1: Block input and send direct window messages (most brutal)
-    BlockInput, On
-    
-    ; Send WM_LBUTTONDOWN (0x201)
-    SendMessage, 0x201, 0x0001, (relY << 16) | relX, , ahk_id %ActiveWindow%
-    Sleep, 50
-    
-    ; Send WM_LBUTTONUP (0x202) 
-    SendMessage, 0x202, 0x0000, (relY << 16) | relX, , ahk_id %ActiveWindow%
-    Sleep, 100
-    
-    ; Method 2: ControlClick as backup
-    ControlClick, x%relX% y%relY%, ahk_id %ActiveWindow%, , LEFT, 1, NA
-    
-    BlockInput, Off
-    
-    ; Method 3: Additional window message methods
     ; Send WM_MOUSEMOVE first
     SendMessage, 0x200, 0x0000, (relY << 16) | relX, , ahk_id %ActiveWindow%
     Sleep, 10
@@ -152,41 +119,18 @@ UltraBrutalDirectClick(x, y) {
     PostMessage, 0x201, 0x0001, (relY << 16) | relX, , ahk_id %ActiveWindow%
     Sleep, 50
     PostMessage, 0x202, 0x0000, (relY << 16) | relX, , ahk_id %ActiveWindow%
+
+    ;BlockInput, On ; Blocks user input (FROZE WHEN DEBUGGING)
     
-    ; Method 4: Multiple rapid attempts
-    Loop, 3 {
-        SendMessage, 0x201, 0x0001, (relY << 16) | relX, , ahk_id %ActiveWindow%
-        Sleep, 20
-        SendMessage, 0x202, 0x0000, (relY << 16) | relX, , ahk_id %ActiveWindow%
-        Sleep, 30
-    }
+    ; Send WM_LBUTTONDOWN (0x201)
+    SendMessage, 0x201, 0x0001, (relY << 16) | relX, , ahk_id %ActiveWindow%
+    Sleep, 100
+    
+    ; Send WM_LBUTTONUP (0x202) 
+    SendMessage, 0x202, 0x0000, (relY << 16) | relX, , ahk_id %ActiveWindow%
+    Sleep, 500
     
     GuiControl,, LastActionText, Direct click sent to window (multiple methods)
-}
-
-; Ultra brutal F3 key press
-UltraBrutalF3() {
-    ; Method 1: Standard AutoHotkey Send
-    Send, {F3}
-    Sleep, 50
-    
-    ; Method 2: SendInput
-    Send, {F3}
-    Sleep, 50
-    
-    ; Method 3: Direct keybd_event DLL calls
-    VK_F3 := 0x72
-    DllCall("keybd_event", "UChar", VK_F3, "UChar", 0, "UInt", 0, "Ptr", 0)  ; Key down
-    Sleep, 50
-    DllCall("keybd_event", "UChar", VK_F3, "UChar", 0, "UInt", 2, "Ptr", 0)  ; Key up (2 = KEYEVENTF_KEYUP)
-    
-    ; Method 4: SendMessage to active window
-    WinGet, ActiveHwnd, ID, A
-    PostMessage, 0x100, %VK_F3%, 0, , ahk_id %ActiveHwnd%  ; WM_KEYDOWN
-    Sleep, 50
-    PostMessage, 0x101, %VK_F3%, 0, , ahk_id %ActiveHwnd%  ; WM_KEYUP
-    
-    GuiControl,, LastActionText, F3 key pressed (multiple methods)
 }
 
 ; Function to remove tooltip
